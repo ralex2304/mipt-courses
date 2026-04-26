@@ -1,6 +1,6 @@
 # Cisco Labs Cheatsheet
 
-MIPT Computer Networks course 5 semester
+MIPT Computer Networks course 5-6 semester
 
 ## Modes
 
@@ -339,7 +339,7 @@ R(config-if)# ip helper-address <DHCP server-router IP>
 
 ### Router as a DHCP client
 
-Configure interface to recieve IP from DHCP
+Configure interface to receive IP from DHCP
 ```
 R(config-if)# ip address dhcp
 R(config-if)# no shutdown
@@ -411,5 +411,327 @@ PC> tracert <IP address>
 SSH:
 ```
 S# ssh -l admin <IP address>
+```
+
+## Wireless
+
+Router credentials: `admin` `admin`
+
+Changeing access password:
+```
+Administration > Management > Router password
+```
+
+DHCP range:
+```
+Setup > Basic setup > Network setup
+```
+
+### WLC - wireless LAN controller
+
+Https only access
+
+Credentials: `admin` `Cisco123`
+
+Create WLAN:
+```
+WLANs > Create New
+```
+
+Don't forget to enable created WLAN
+
+Select VLAN:
+```
+WLANs > Edit 'WLAN name' > General > Interface/Interface Group (G)
+```
+
+Enable FlexConnect:
+```
+WLANs > Edit 'WLAN name' > Advanced > FlexConnect local switching, FlexConnect local auth
+```
+
+Secure the WLAN:
+```
+WLANs > Edit 'WLAN name' > Security > Layer 2 > PSK
+```
+
+Create VLAN:
+```
+Controller > Interfaces > New
+```
+
+RADIUS server:
+```
+Security > New
+```
+
+Enable 802.1X (external) auth in WLAN settings:
+```
+WLANs > Edit 'WLAN name' > Security > Layer 2 > 802.1X
+                                    > AAA Servers > Server1
+```
+
+DHCP:
+```
+Controller > Interfaces > Edit > Primary DHCP Server
+```
+
+Internal DHCP server:
+```
+Controller > Internal DHCP server > DHCP Scope > New
+```
+
+SNMP:
+```
+Management > SNMP > Trap Receivers > New
+```
+
+## OSPF
+
+Configure router IDs:
+```
+R(config)# router ospf <process-id>         // process-id -- must be the same on all routers
+R(config-router)# router-id <rid>           // rid -- individual router id
+```
+
+Configure OSPF routing:
+```
+R(config-router)# network <network address> <wildcard-mask> area <area-id>      // area-id -- usually we have only one area, so = 0
+```
+
+wildcard-mask is negative of subnet mask (i.e for subnet 255.255.255.252 (/30) wildcard = 0.0.0.3)
+
+Also it's possible to configure OSPF on interface (it will automatically get IP parameters)
+```
+R(config-if)# ip ospf area <are-id>
+```
+
+Interfaces that aren't connected to other routers must be configured as passive:
+```
+R(config-router)# pasive-interface <interface>
+```
+
+Set priority:
+```
+R(config-if)# ip ospf priority <priority>        // priority -- 0-255, higher - better
+```
+
+Distribute the default route to all routers:
+```
+R(config)# ip route 0.0.0.0 0.0.0.0 <interface>
+R(config)# router ospf <process-id>
+R(config-router)# default-information originate
+```
+
+Configure OSPF reference cost:
+```
+R(config-router)# auto-cost reference-bandwidth <reference>      // cost = reference / interface-bandwidth. default 100. Must be set on all routers
+```
+
+Configure OSPF interface cost:
+```
+R(config-if)# ip ospf cost <cost>
+```
+
+Hello and dead timer values:
+```
+R(config-if)# ip ospf hello-interval <val>      // default: 10
+R(config-if)# ip ospf dead-interval <val>       // default: 40
+```
+
+### Diagnostics
+
+```
+R# show ip protocols
+```
+
+```
+R# show ip route
+```
+
+## ACL - access control lists
+
+Enter configuration mode (named ACL):
+```
+R# ip access-list {standard | extended} <name>
+```
+
+Standard ACL:
+  - only source address
+  - no protocol
+Extended ACL:
+  - source and dest addresses
+  - protocol
+  - port number
+
+By default access list bans all traffic, that doesn't match the rules
+
+Add rule:
+```
+R(config-ext-nacl)# {permit | deny} <protocol> <source> <dest> [eq <port>]
+
+<source, dest> = {host <ip>} || {<ip> <mask>} || {any}
+```
+
+For numbered ACLs:
+```
+R(config)# access-list <number> {permit | deny} ...
+```
+
+Apply ACL to the interface:
+```
+R(config)# interface <int>
+R(config-if)# ip access-group <name> {in | out}
+```
+
+### Diagnostics
+
+```
+R# show access-lists
+```
+
+## NAT, PAT
+
+Static NAT:
+```
+R(config)# ip nat {inside | outside} source static <inside ip> <outside ip>
+```
+
+Apply to interface:
+```
+R(config-if)# ip nat {inside | outside}
+```
+
+Dynamic NAT:
+```
+R(config)# ip nat pool <pool name> <start ip> <end ip> netmask <mask>
+```
+
+Associate NAT with ACL:
+```
+R(config)# ip nat {inside | outside} source list <list number> {pool <pool name> || <interface>} [overload]
+```
+
+`overload` enables reuse of one NAT ip by several internal devices. It's dynamic PAT
+
+### Diagnostics
+
+```
+R# show run | include nat
+R# show ip nat translations
+R# show ip nat statistics
+```
+
+## GRE tunnel
+
+```
+R(config)# interface tunnel <number>
+R(config-if)# ip address <ip> <mask>
+R(config-if)# tunnel source {<ip> || <interface>}
+R(config-if)# tunnel destination {<ip> || <interface>}
+R(config-if)# tunnel mode gre ip
+R(config-if)# no shutdown
+```
+
+Similar commands must be done on second router
+
+## Passwords and SSH
+
+Encrypt all plaintext passwords
+```
+R(config)# service password-encryption
+```
+
+Set domain name:
+```
+R(config)# no ip domain-lookup
+R(config)# ip domain-name CCNA.com
+```
+
+Create user with password:
+```
+R(config)# username <name> secret <password>
+```
+
+Generate 1024-bit RSA keys:
+```
+R(config)# crypto key generate rsa
+    1024
+```
+
+Block failed logins:
+```
+R(config)# login block-for <blocking period in seconds> attempts <attempts number> within <attempts period in seconds>
+```
+
+Enable SSH:
+```
+R(config)# line vty <start> <end>
+R(config-line)# transport input ssh
+R(config-line)# login local
+```
+
+Set EXEC mode timeout:
+```
+R(config-line)# exec-timeout <period in minutes>
+```
+
+### Switch security
+
+Port security:
+```
+Switch(config-if)# switchport mode access
+Switch(config-if)# switchport port-security
+```
+
+Limit MAC addresses:
+```
+Switch(config-if)# switchport port-security maximum <number>
+```
+
+Fix MAC address:
+```
+Switch(config-if)# switchport port-security mac-address <MAC>
+```
+
+Sticky MAC:
+```
+Switch(config-if)# switchport port-security mac-address sticky
+```
+
+Drop disallowed packets, but don't disable the ports:
+```
+Switch(config-if)# switchport port-security violation restrict
+```
+
+#### DHCP Snooping
+
+Set interface as trusted:
+```
+Switch(config-if)# ip dhcp snooping trust
+```
+
+Set DHCP packets limit (per second):
+```
+Switch(config-if)# ip dhcp snooping limit rate <number of packets per second>
+```
+
+Enable DHCP snooping globally and for VLANs:
+```
+Switch(config)# ip dhcp snooping
+Switch(config)# ip dhcp snooping vlan <num>[{,<num>}...]
+```
+
+#### PortFast and BPDU Guard
+
+Per interface:
+```
+Switch(config-if)# spanning-tree portfast
+Switch(config-if)# spanning-tree bpduguard enable
+```
+
+Globally:
+```
+Switch(config)# spanning-tree portfast default
 ```
 
